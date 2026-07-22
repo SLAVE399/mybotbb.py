@@ -1,0 +1,5 @@
+pyrogram==2.0.106
+tgcrypto==1.2.5
+pytgcalls==3.0.0.dev24
+youtube-search-python==1.6.6
+yt-dlp==2023.7.6

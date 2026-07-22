@@ -216,7 +216,8 @@ async def play_cmd(client, msg):
         return await sm.edit_text(f"{e('error')} **Not found!**")
 
     r = res[0]
-   await sm.edit_text(f"{e('loading')} **Found:** `{r['title'][:40]}`\n{e('download')} Downloading...") 
+    await sm.edit_text(f"{e('loading')} **Found:** `{r['title'][:40]}`\n{e('download')} Downloading...")
+   
 
     song = dl_audio(r['id'], r['title'])
     if not song:

@@ -20,9 +20,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8923356127:AAERWVP6hCWTBQZbdlGrzxTOCPX8GN5Yq
 # ═══════════════════════════════════════════════════════════════
 
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioPiped
+from pytgcalls.types.input_stream import AudioPiped
 from youtube_search import YoutubeSearch
 import yt_dlp
 import random
@@ -41,6 +41,7 @@ def e(category):
         "success": ["✅", "🎉", "✨"], "error": ["❌", "💔"],
         "loading": ["⏳", "🔄"], "cool": ["😎", "🔥", "💯"],
         "party": ["🎉", "🥳"], "info": ["ℹ️", "💡"],
+        "search": ["🔍", "🔎"], "download": ["⬇️", "📥"],
     }
     return random.choice(emojis.get(category, ["✨"]))
 
@@ -74,7 +75,7 @@ loop_mode = {}
 def search_yt(query, max_results=5):
     try:
         return YoutubeSearch(query, max_results=max_results).to_dict()
-    except:
+    except Exception:
         return []
 
 def dl_audio(vid, title):
@@ -133,7 +134,7 @@ async def play_next(cid, msg=None):
         current[cid] = song
         try:
             await call.join_group_call(cid, AudioPiped(song['file']))
-        except:
+        except Exception:
             await call.change_stream(cid, AudioPiped(song['file']))
 
         txt = f"""
@@ -217,7 +218,6 @@ async def play_cmd(client, msg):
 
     r = res[0]
     await sm.edit_text(f"{e('loading')} **Found:** `{r['title'][:40]}`\n{e('download')} Downloading...")
-   
 
     song = dl_audio(r['id'], r['title'])
     if not song:
@@ -232,11 +232,8 @@ async def play_cmd(client, msg):
         await play_next(cid, msg)
     else:
         await sm.edit_text(
-            f"{e('success')} **Added!**
-
-"
-            f"{me()} `{song['title'][:50]}`
-"
+            f"{e('success')} **Added!**\n\n"
+            f"{me()} `{song['title'][:50]}`\n"
             f"📊 Position: `#{len(queues[cid])}`"
         )
 
@@ -252,15 +249,10 @@ async def search_cmd(client, msg):
     if not res:
         return await sm.edit_text(f"{e('error')} **No results!**")
 
-    txt = f"{e('search')} {banner('SEARCH RESULTS')} {e('search')}
-
-"
+    txt = f"{e('search')} {banner('SEARCH RESULTS')} {e('search')}\n\n"
     em = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
     for i, r in enumerate(res):
-        txt += f"{em[i]} **{r['title']}**
-   ⏱ `{r.get('duration', '?')}`
-
-"
+        txt += f"{em[i]} **{r['title']}**\n   ⏱ `{r.get('duration', '?')}`\n\n"
     txt += f"{e('cool')} Click to play!"
 
     await sm.edit_text(txt, reply_markup=search_kb(res))
@@ -274,28 +266,22 @@ async def skip_cmd(client, msg):
     skipped = current[cid]['title']
     try:
         await call.change_stream(cid)
-    except:
+    except Exception:
         pass
-    await msg.reply_text(f"{e('skip')} **Skipped!**
-
-⏭️ `{skipped[:50]}`")
+    await msg.reply_text(f"{e('skip')} **Skipped!**\n\n⏭️ `{skipped[:50]}`")
     await play_next(cid)
 
 @app.on_message(filters.command("pause"))
 async def pause_cmd(client, msg):
     cid = msg.chat.id
     await call.pause(cid)
-    await msg.reply_text(f"{e('pause')} **Paused!**
-
-⏸️ `{current[cid]['title'][:50]}`")
+    await msg.reply_text(f"{e('pause')} **Paused!**\n\n⏸️ `{current[cid]['title'][:50]}`")
 
 @app.on_message(filters.command("resume"))
 async def resume_cmd(client, msg):
     cid = msg.chat.id
     await call.resume(cid)
-    await msg.reply_text(f"{e('play')} **Resumed!**
-
-▶️ `{current[cid]['title'][:50]}`")
+    await msg.reply_text(f"{e('play')} **Resumed!**\n\n▶️ `{current[cid]['title'][:50]}`")
 
 @app.on_message(filters.command("stop"))
 async def stop_cmd(client, msg):
@@ -304,11 +290,9 @@ async def stop_cmd(client, msg):
     current.pop(cid, None)
     try:
         await call.leave_group_call(cid)
-    except:
+    except Exception:
         pass
-    await msg.reply_text(f"{e('stop')} **Stopped!**
-
-👋 See you! Use `/play` to start again.")
+    await msg.reply_text(f"{e('stop')} **Stopped!**\n\n👋 See you! Use `/play` to start again.")
 
 @app.on_message(filters.command("queue"))
 async def queue_cmd(client, msg):
@@ -316,17 +300,11 @@ async def queue_cmd(client, msg):
     if cid not in queues or not queues[cid]:
         return await msg.reply_text(f"{e('info')} **Queue empty!**")
 
-    txt = f"{e('cool')} {banner('QUEUE')} {e('cool')}
-
-"
+    txt = f"{e('cool')} {banner('QUEUE')} {e('cool')}\n\n"
     if cid in current and current.get(cid):
-        txt += f"🎵 **Now:** `{current[cid]['title']}`
-
-📋 **Next:**
-"
+        txt += f"🎵 **Now:** `{current[cid]['title']}`\n\n📋 **Next:**\n"
     for i, s in enumerate(queues[cid][:10], 1):
-        txt += f"`{i}.` {s['title'][:40]}
-"
+        txt += f"`{i}.` {s['title'][:40]}\n"
     await msg.reply_text(txt)
 
 @app.on_message(filters.command("loop"))
@@ -360,8 +338,7 @@ async def cb(client, cb):
             await play_next(cid)
         else:
             await cb.message.edit_text(
-                f"{e('success')} **Added!** `{song['title'][:40]}`
-Position: `#{len(queues[cid])}`"
+                f"{e('success')} **Added!** `{song['title'][:40]}`\nPosition: `#{len(queues[cid])}`"
             )
         return
 
@@ -378,7 +355,7 @@ Position: `#{len(queues[cid])}`"
     elif d == "skip":
         try:
             await call.change_stream(cid)
-        except:
+        except Exception:
             pass
         await cb.answer("⏭️ Skipped!")
         await play_next(cid)
@@ -387,7 +364,7 @@ Position: `#{len(queues[cid])}`"
         current.pop(cid, None)
         try:
             await call.leave_group_call(cid)
-        except:
+        except Exception:
             pass
         await cb.answer("🛑 Stopped!")
         await cb.message.edit_text(f"{e('stop')} **Stopped!**")
@@ -398,11 +375,9 @@ Position: `#{len(queues[cid])}`"
         if cid not in queues or not queues[cid]:
             await cb.answer("📭 Empty!", show_alert=True)
         else:
-            txt = f"📋 Queue ({len(queues[cid])}):
-"
+            txt = f"📋 Queue ({len(queues[cid])}):\n"
             for i, s in enumerate(queues[cid][:5], 1):
-                txt += f"{i}. {s['title'][:30]}
-"
+                txt += f"{i}. {s['title'][:30]}\n"
             await cb.answer(txt[:200], show_alert=True)
 
 @call.on_stream_end()
@@ -416,6 +391,20 @@ async def on_end(client, upd):
 # 🚀 RUN
 # ═══════════════════════════════════════════════════════════════
 
+async def set_commands():
+    await app.set_bot_commands([
+        BotCommand("start", "🎵 Start the bot"),
+        BotCommand("help", "ℹ️ Show all commands"),
+        BotCommand("play", "▶️ Play a song"),
+        BotCommand("search", "🔍 Search and pick a song"),
+        BotCommand("skip", "⏭️ Skip to next song"),
+        BotCommand("pause", "⏸️ Pause playback"),
+        BotCommand("resume", "▶️ Resume playback"),
+        BotCommand("stop", "⏹️ Stop and leave VC"),
+        BotCommand("queue", "📋 View the queue"),
+        BotCommand("loop", "🔁 Toggle loop mode"),
+    ])
+
 if __name__ == "__main__":
     os.makedirs("downloads", exist_ok=True)
     print("""
@@ -423,4 +412,10 @@ if __name__ == "__main__":
     ║     🎵 VIBE MUSIC BOT STARTING 🎵     ║
     ╚═══════════════════════════════════════╝
     """)
-    app.run()
+    app.start()
+    app.loop.run_until_complete(set_commands())
+    print("✅ Bot commands registered with Telegram!")
+    call.start()
+    from pyrogram import idle
+    idle()
+    app.stop()

@@ -21,8 +21,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8923356127:AAERWVP6hCWTBQZbdlGrzxTOCPX8GN5Yq
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
-from pytgcalls import PyTgCalls
-from pytgcalls.types.input_stream import AudioPiped
+from pytgcalls import PyTgCalls, idle
+from pytgcalls.types import MediaStream
 from youtube_search import YoutubeSearch
 import yt_dlp
 import random
@@ -132,10 +132,7 @@ async def play_next(cid, msg=None):
     if cid in queues and queues[cid]:
         song = queues[cid].pop(0)
         current[cid] = song
-        try:
-            await call.join_group_call(cid, AudioPiped(song['file']))
-        except Exception:
-            await call.change_stream(cid, AudioPiped(song['file']))
+        await call.play(cid, MediaStream(song['file']))
 
         txt = f"""
 {me()} {banner("NOW PLAYING")} {me()}
@@ -264,23 +261,19 @@ async def skip_cmd(client, msg):
         return await msg.reply_text(f"{e('error')} **Nothing playing!**")
 
     skipped = current[cid]['title']
-    try:
-        await call.change_stream(cid)
-    except Exception:
-        pass
     await msg.reply_text(f"{e('skip')} **Skipped!**\n\n⏭️ `{skipped[:50]}`")
     await play_next(cid)
 
 @app.on_message(filters.command("pause"))
 async def pause_cmd(client, msg):
     cid = msg.chat.id
-    await call.pause(cid)
+    await call.pause_stream(cid)
     await msg.reply_text(f"{e('pause')} **Paused!**\n\n⏸️ `{current[cid]['title'][:50]}`")
 
 @app.on_message(filters.command("resume"))
 async def resume_cmd(client, msg):
     cid = msg.chat.id
-    await call.resume(cid)
+    await call.resume_stream(cid)
     await msg.reply_text(f"{e('play')} **Resumed!**\n\n▶️ `{current[cid]['title'][:50]}`")
 
 @app.on_message(filters.command("stop"))
@@ -289,7 +282,7 @@ async def stop_cmd(client, msg):
     queues[cid] = []
     current.pop(cid, None)
     try:
-        await call.leave_group_call(cid)
+        await call.leave_call(cid)
     except Exception:
         pass
     await msg.reply_text(f"{e('stop')} **Stopped!**\n\n👋 See you! Use `/play` to start again.")
@@ -347,23 +340,19 @@ async def cb(client, cb):
         return
 
     if d == "pause":
-        await call.pause(cid)
+        await call.pause_stream(cid)
         await cb.answer("⏸️ Paused!")
     elif d == "resume":
-        await call.resume(cid)
+        await call.resume_stream(cid)
         await cb.answer("▶️ Resumed!")
     elif d == "skip":
-        try:
-            await call.change_stream(cid)
-        except Exception:
-            pass
         await cb.answer("⏭️ Skipped!")
         await play_next(cid)
     elif d == "stop":
         queues[cid] = []
         current.pop(cid, None)
         try:
-            await call.leave_group_call(cid)
+            await call.leave_call(cid)
         except Exception:
             pass
         await cb.answer("🛑 Stopped!")
@@ -381,8 +370,8 @@ async def cb(client, cb):
             await cb.answer(txt[:200], show_alert=True)
 
 @call.on_stream_end()
-async def on_end(client, upd):
-    cid = upd.chat_id
+async def on_end(client, update):
+    cid = update.chat_id
     if loop_mode.get(cid, False) and cid in current:
         queues[cid].insert(0, current[cid])
     await play_next(cid)
@@ -416,6 +405,5 @@ if __name__ == "__main__":
     app.loop.run_until_complete(set_commands())
     print("✅ Bot commands registered with Telegram!")
     call.start()
-    from pyrogram import idle
     idle()
     app.stop()

@@ -23,7 +23,6 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from pytgcalls import PyTgCalls, idle
 from pytgcalls.types import MediaStream
-from pytgcalls.types.stream import StreamAudioEnded
 from youtube_search import YoutubeSearch
 import yt_dlp
 import random
@@ -370,13 +369,31 @@ async def cb(client, cb):
                 txt += f"{i}. {s['title'][:30]}\n"
             await cb.answer(txt[:200], show_alert=True)
 
-@call.on_update()
-async def on_update(client, update):
-    if isinstance(update, StreamAudioEnded):
-        cid = update.chat_id
-        if loop_mode.get(cid, False) and cid in current:
-            queues[cid].insert(0, current[cid])
-        await play_next(cid)
+async def _on_song_finished(cid):
+    if loop_mode.get(cid, False) and cid in current:
+        queues[cid].insert(0, current[cid])
+    await play_next(cid)
+
+def register_stream_end_handler():
+    """Different pytgcalls versions expose the 'stream ended' event
+    differently. Try the known ways; if none exist, auto-next is
+    simply disabled and users can still use /skip manually."""
+    if hasattr(call, "on_stream_end"):
+        @call.on_stream_end()
+        async def _handler(client, update):
+            await _on_song_finished(update.chat_id)
+        print("✅ Auto-next enabled via on_stream_end")
+    elif hasattr(call, "on_update"):
+        @call.on_update()
+        async def _handler(client, update):
+            cls_name = type(update).__name__
+            if "End" in cls_name or "Finish" in cls_name:
+                await _on_song_finished(update.chat_id)
+        print("✅ Auto-next enabled via on_update")
+    else:
+        print("⚠️ No stream-end event found in this pytgcalls version — use /skip manually to move to next song.")
+
+register_stream_end_handler()
 
 # ═══════════════════════════════════════════════════════════════
 # 🚀 RUN

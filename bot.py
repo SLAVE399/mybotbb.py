@@ -23,6 +23,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from pytgcalls import PyTgCalls, idle
 from pytgcalls.types import MediaStream
+from pytgcalls.types.stream import StreamAudioEnded
 from youtube_search import YoutubeSearch
 import yt_dlp
 import random
@@ -369,12 +370,13 @@ async def cb(client, cb):
                 txt += f"{i}. {s['title'][:30]}\n"
             await cb.answer(txt[:200], show_alert=True)
 
-@call.on_stream_end()
-async def on_end(client, update):
-    cid = update.chat_id
-    if loop_mode.get(cid, False) and cid in current:
-        queues[cid].insert(0, current[cid])
-    await play_next(cid)
+@call.on_update()
+async def on_update(client, update):
+    if isinstance(update, StreamAudioEnded):
+        cid = update.chat_id
+        if loop_mode.get(cid, False) and cid in current:
+            queues[cid].insert(0, current[cid])
+        await play_next(cid)
 
 # ═══════════════════════════════════════════════════════════════
 # 🚀 RUN
